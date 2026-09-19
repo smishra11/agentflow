@@ -8,12 +8,13 @@ from dotenv import load_dotenv
 load_dotenv()
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_ANON_KEY")
+# FIX: Use the Service Role Key to bypass RLS on backend database operations
+SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 
 if not SUPABASE_URL or not SUPABASE_KEY:
-    raise ValueError("Missing Supabase environment variables")
+    raise ValueError("Missing Supabase environment variables. Make sure SUPABASE_SERVICE_ROLE_KEY is set in your .env file")
 
-# Initialize Supabase client
+# Initialize Supabase client with admin privileges
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # This tells FastAPI to look for an "Authorization: Bearer <token>" header
