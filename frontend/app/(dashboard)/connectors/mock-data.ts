@@ -4,6 +4,7 @@ export type ConnectorCategory =
   | "communication"
   | "developer"
   | "storage"
+  | "productivity"
   | "custom";
 
 export type ConnectorStatus = "connected" | "disconnected" | "error";
@@ -20,55 +21,107 @@ export interface Connector {
 }
 
 export const MOCK_CONNECTORS: Connector[] = [
+  // --- COMMUNICATION ---
   {
-    id: "resend",
-    name: "Resend (Email)",
+    id: "gmail",
+    name: "Gmail API",
     description:
-      "Send transactional alerts and automated agent digests via email API.",
+      "Read, categorize, and draft responses to emails automatically.",
     category: "communication",
     status: "connected",
-    freeTierNote: "3,000 emails/mo free",
-    connectedAt: "2 days ago",
-    configSummary: "sender@agentflow.dev",
+    freeTierNote: "1B quota units/day free",
+    connectedAt: "1 day ago",
+    configSummary: "user@gmail.com",
   },
   {
     id: "slack",
-    name: "Slack Webhooks",
+    name: "Slack",
     description:
       "Post notifications, agent run results, and action prompts to channels.",
     category: "communication",
     status: "connected",
-    freeTierNote: "Unlimited incoming webhooks",
+    freeTierNote: "Unlimited internal workspace usage",
     connectedAt: "5 days ago",
     configSummary: "#agent-alerts",
   },
   {
     id: "discord",
-    name: "Discord Webhook",
+    name: "Discord",
     description:
-      "Stream live execution traces and failure alerts to community channels.",
+      "Stream live execution traces and failure alerts to community servers.",
     category: "communication",
     status: "disconnected",
-    freeTierNote: "100% free unlimited webhook feeds",
+    freeTierNote: "100% free unlimited webhooks",
   },
+
+  // --- PRODUCTIVITY ---
+  {
+    id: "googlecalendar",
+    name: "Google Calendar",
+    description:
+      "Find available slots, resolve meeting conflicts, and schedule events.",
+    category: "productivity",
+    status: "disconnected",
+    freeTierNote: "Massive free tier for developers",
+  },
+  {
+    id: "notion",
+    name: "Notion",
+    description: "Create pages, update databases, and summarize documents.",
+    category: "productivity",
+    status: "disconnected",
+    freeTierNote: "Free internal workspace integration",
+  },
+
+  // --- STORAGE & DATA ---
+  {
+    id: "googledrive",
+    name: "Google Drive",
+    description:
+      "Read documents, upload generated reports, and manage folders.",
+    category: "storage",
+    status: "disconnected",
+    freeTierNote: "15GB free storage pool",
+  },
+  {
+    id: "supabase",
+    name: "Supabase",
+    description:
+      "Store agent memory, relational tables, and vector embeddings.",
+    category: "storage",
+    status: "connected",
+    freeTierNote: "500MB free database tier",
+    connectedAt: "1 week ago",
+    configSummary: "db.agentflow.internal",
+  },
+
+  // --- DEVELOPER ---
   {
     id: "github",
     name: "GitHub",
-    description:
-      "Trigger workflows from commit events, create PRs, and read repositories.",
+    description: "Trigger workflows, review PRs, and triage repository issues.",
     category: "developer",
     status: "disconnected",
-    freeTierNote: "Free personal access tokens & public events",
+    freeTierNote: "Free personal access tokens",
   },
   {
-    id: "supabase-db",
-    name: "Supabase PostgreSQL",
+    id: "linear",
+    name: "Linear",
     description:
-      "Store agent memory, relational tables, and vector embeddings directly.",
-    category: "storage",
-    status: "connected",
-    freeTierNote: "500MB free database tier included",
-    connectedAt: "1 week ago",
-    configSummary: "db.agentflow.internal",
+      "Create issues, update project statuses, and sync engineering tasks.",
+    category: "developer",
+    status: "disconnected",
+    freeTierNote: "Free standard API access",
+  },
+
+  // --- CUSTOM ---
+  {
+    id: "webhook",
+    name: "Custom Webhook",
+    description:
+      "Send generic HTTP POST payloads to any external service or API.",
+    category: "custom",
+    status: "disconnected",
+    freeTierNote: "Zero limits",
   },
 ];
