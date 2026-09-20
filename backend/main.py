@@ -1,13 +1,26 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from auth import get_current_user, supabase
+from contextlib import asynccontextmanager
 
 import os
 import httpx
 from pydantic import BaseModel
 from crypto import encrypt_token
+from engine import scheduler, sync_agent_schedules, execute_agent_task
 
-app = FastAPI(title="AgentFlow Core API")
+# Define the startup and shutdown logic
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: Start the background scheduler and sync agents
+    scheduler.start()
+    sync_agent_schedules()
+    yield
+    # Shutdown: Stop the scheduler
+    scheduler.shutdown()
+
+# Pass the lifespan function into FastAPI
+app = FastAPI(title="AgentFlow Core API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -45,12 +58,12 @@ async def get_dashboard_data(user = Depends(get_current_user)):
                 metrics[run["status"]] += 1
                 
         activity_response = supabase.table("agent_runs") \
-            .select("id, status, created_at, agents(name, description)") \
+            .select("id, status, created_at, agents(name, system_prompt)") \
             .eq("user_id", user.id) \
             .order("created_at", desc=True) \
             .limit(5) \
             .execute()
-            
+
         return {
             "metrics": metrics,
             "recent_activity": activity_response.data
@@ -60,7 +73,7 @@ async def get_dashboard_data(user = Depends(get_current_user)):
         print("Database error:", e)
         raise HTTPException(status_code=500, detail="Failed to fetch dashboard data")
 
-    
+# 3. Google OAuth Route
 @app.post("/api/connectors/google/exchange")
 async def google_token_exchange(req: OAuthExchangeRequest, user = Depends(get_current_user)):
     try:
@@ -119,3 +132,28 @@ async def google_token_exchange(req: OAuthExchangeRequest, user = Depends(get_cu
     except Exception as e:
         print("OAuth Error:", str(e))
         raise HTTPException(status_code=500, detail="Failed to connect Google account")
+
+# 4. Deployment Webhook Route
+class AgentDeployWebhook(BaseModel):
+    agent_id: str
+    user_id: str
+    name: str
+    cron_schedule: str
+
+@app.post("/api/engine/deploy")
+async def handle_new_deployment(payload: AgentDeployWebhook, background_tasks: BackgroundTasks):
+    print(f"📥 Received deployment webhook for: {payload.name}")
+    
+    if payload.cron_schedule == "once":
+        print("⚡ 'Only Once' schedule detected. Triggering immediate execution.")
+        background_tasks.add_task(
+            execute_agent_task, 
+            payload.agent_id, 
+            payload.user_id, 
+            payload.name
+        )
+        return {"status": "executing", "message": "Agent triggered immediately."}
+    else:
+        print("📅 Recurring schedule detected. Syncing APScheduler.")
+        sync_agent_schedules()
+        return {"status": "scheduled", "message": "Scheduler synced."}

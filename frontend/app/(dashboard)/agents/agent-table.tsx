@@ -1,5 +1,15 @@
+"use client";
+
 import Link from "next/link";
-import { Bot, ChevronRight, MoreHorizontal } from "lucide-react";
+import {
+  Bot,
+  ChevronRight,
+  MoreHorizontal,
+  Pause,
+  Play,
+  Ban,
+  Trash2,
+} from "lucide-react";
 import {
   Table,
   TableBody,
@@ -9,8 +19,21 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
-type AgentStatus = "active" | "paused" | "error" | "completed";
+type AgentStatus =
+  | "active"
+  | "running"
+  | "paused"
+  | "error"
+  | "completed"
+  | "canceled";
 
 const STATUS_STYLES: Record<
   AgentStatus,
@@ -20,6 +43,12 @@ const STATUS_STYLES: Record<
     label: "Active",
     dot: "bg-blue-500",
     badge: "border-blue-500/20 bg-blue-500/10 text-blue-400",
+    pulse: true,
+  },
+  running: {
+    label: "Running",
+    dot: "bg-cyan-500",
+    badge: "border-cyan-500/20 bg-cyan-500/10 text-cyan-400",
     pulse: true,
   },
   paused: {
@@ -37,6 +66,11 @@ const STATUS_STYLES: Record<
     dot: "bg-emerald-500",
     badge: "border-emerald-500/20 bg-emerald-500/10 text-emerald-400",
   },
+  canceled: {
+    label: "Canceled",
+    dot: "bg-zinc-500",
+    badge: "border-zinc-500/20 bg-zinc-500/10 text-zinc-400",
+  },
 };
 
 const formatFrequency = (cron?: string) => {
@@ -50,9 +84,17 @@ const formatFrequency = (cron?: string) => {
   return "Custom";
 };
 
-// Removed "use client" and useRouter! This is now a 100% Server Component.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function AgentsTable({ agents }: { agents: any[] }) {
+interface AgentsTableProps {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  agents: any[];
+  onAction?: (
+    action: "pause" | "continue" | "cancel" | "delete",
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    agent: any,
+  ) => void;
+}
+
+export function AgentsTable({ agents, onAction }: AgentsTableProps) {
   if (!agents || agents.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center rounded-xl border border-border/40 bg-background/40 py-24 backdrop-blur-md">
@@ -66,6 +108,20 @@ export function AgentsTable({ agents }: { agents: any[] }) {
       </div>
     );
   }
+
+  const handleMenuAction = (
+    action: "pause" | "continue" | "cancel" | "delete",
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    agent: any,
+    e: React.MouseEvent,
+  ) => {
+    e.stopPropagation();
+    if (onAction) {
+      onAction(action, agent);
+    } else {
+      console.log(`Action "${action}" triggered for agent:`, agent.id);
+    }
+  };
 
   return (
     <div className="overflow-hidden rounded-xl border border-border/40 bg-background/40 backdrop-blur-md">
@@ -92,9 +148,9 @@ export function AgentsTable({ agents }: { agents: any[] }) {
         </TableHeader>
         <TableBody>
           {agents.map((agent) => {
-            const style =
-              STATUS_STYLES[agent.status as AgentStatus] ||
-              STATUS_STYLES.active;
+            const currentStatus = (agent.status as AgentStatus) || "active";
+            const style = STATUS_STYLES[currentStatus] || STATUS_STYLES.active;
+
             const createdDate = new Date(agent.created_at).toLocaleString(
               "en-US",
               {
@@ -107,6 +163,18 @@ export function AgentsTable({ agents }: { agents: any[] }) {
               },
             );
 
+            // Status rules for action availability
+            const isPaused = currentStatus === "paused";
+            const isActiveOrRunning =
+              currentStatus === "active" || currentStatus === "running";
+            const isCanceled = currentStatus === "canceled";
+            const isCompleted = currentStatus === "completed";
+
+            const canPause = isActiveOrRunning;
+            const canContinue = isPaused;
+            const canCancel = !isCanceled && !isCompleted;
+            const canDelete = true;
+
             return (
               <TableRow
                 key={agent.id}
@@ -114,14 +182,12 @@ export function AgentsTable({ agents }: { agents: any[] }) {
               >
                 {/* Agent Identity Column */}
                 <TableCell className="py-4">
-                  {/* FIXED: The link is now z-10 so it sits ON TOP of all text and catches the click */}
                   <Link
                     href={`/agents/${agent.id}`}
                     className="absolute inset-0 z-10"
                     aria-label={`View ${agent.name}`}
                   />
 
-                  {/* FIXED: Removed z-10 and pointer-events classes. The text sits naturally underneath the link. */}
                   <div className="flex items-center gap-4">
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border/50 bg-zinc-800/50 shadow-sm">
                       <Bot className="h-5 w-5 text-muted-foreground transition-colors group-hover:text-foreground" />
@@ -184,7 +250,70 @@ export function AgentsTable({ agents }: { agents: any[] }) {
 
                 {/* Actions Column */}
                 <TableCell className="py-4 pr-4">
-                  <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-1" />
+                  <div className="relative z-20 flex items-center justify-end gap-2">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger
+                        asChild
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 opacity-0 transition-opacity group-hover:opacity-100 data-[state=open]:opacity-100 hidden sm:inline-flex"
+                          aria-label="Open agent menu"
+                        >
+                          <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent
+                        align="end"
+                        className="w-44 border-border/50 bg-zinc-950/95 backdrop-blur-md"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <DropdownMenuItem
+                          disabled={!canPause}
+                          onClick={(e) => handleMenuAction("pause", agent, e)}
+                          className="cursor-pointer gap-2 text-xs"
+                        >
+                          <Pause className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span>Pause</span>
+                        </DropdownMenuItem>
+
+                        <DropdownMenuItem
+                          disabled={!canContinue}
+                          onClick={(e) =>
+                            handleMenuAction("continue", agent, e)
+                          }
+                          className="cursor-pointer gap-2 text-xs"
+                        >
+                          <Play className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span>Continue</span>
+                        </DropdownMenuItem>
+
+                        <DropdownMenuItem
+                          disabled={!canCancel}
+                          onClick={(e) => handleMenuAction("cancel", agent, e)}
+                          className="cursor-pointer gap-2 text-xs"
+                        >
+                          <Ban className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span>Cancel</span>
+                        </DropdownMenuItem>
+
+                        <DropdownMenuSeparator className="bg-border/40" />
+
+                        <DropdownMenuItem
+                          disabled={!canDelete}
+                          onClick={(e) => handleMenuAction("delete", agent, e)}
+                          className="cursor-pointer gap-2 text-xs text-red-400 focus:bg-red-500/10 focus:text-red-400"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          <span>Delete</span>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+
+                    <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-1" />
+                  </div>
                 </TableCell>
               </TableRow>
             );
