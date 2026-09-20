@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 
 import { fetchDashboardData } from "@/actions/dashboard";
+import Link from "next/link";
 
 // --- TYPESCRIPT INTERFACES ---
 interface AgentRunActivity {
@@ -185,14 +186,12 @@ export default function CommandCenterPage() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Button
-            size="sm"
-            className="h-9 shadow-sm"
-            onClick={() => alert("Deployment flow coming next!")}
-          >
-            <Plus className="mr-1 h-4 w-4" />
-            Deploy Agent
-          </Button>
+          <Link href="/agents/create">
+            <Button size="sm" className="h-9 shadow-sm">
+              <Plus className="mr-1 h-4 w-4" />
+              Deploy Agent
+            </Button>
+          </Link>
         </div>
       </div>
 

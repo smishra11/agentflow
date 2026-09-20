@@ -1,9 +1,12 @@
 "use client";
 
-import { Plus, Settings2 } from "lucide-react";
+import { useTransition } from "react";
+import { Plus, Unplug, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Connector } from "./mock-data";
 import { BrandIcon } from "./BrandIcon";
+import { disconnectTool } from "@/actions/connectors";
+import { getOAuthUrl } from "@/lib/connector";
 
 interface ConnectorCardProps {
   connector: Connector;
@@ -11,35 +14,30 @@ interface ConnectorCardProps {
 
 export function ConnectorCard({ connector }: ConnectorCardProps) {
   const isConnected = connector.status === "connected";
-
-  // Define the scopes our AI might need.
-  // Adding them all into one Google consent screen prevents multiple logins.
-  const GOOGLE_SCOPES = [
-    "openid",
-    "email",
-    "profile",
-    "https://www.googleapis.com/auth/calendar",
-    "https://www.googleapis.com/auth/gmail.modify",
-    "https://www.googleapis.com/auth/drive.file",
-  ].join(" ");
+  const [isPending, startTransition] = useTransition();
 
   const handleConnect = () => {
-    if (
-      ["gmail", "googlecalendar", "googledrive"].includes(
-        connector.id.toLowerCase(),
-      )
-    ) {
-      // We pass NEXT_PUBLIC_SUPABASE_URL just to get the frontend origin easily,
-      // but hardcoding localhost for dev is fine too.
-      const redirectUri = "http://localhost:3000/api/connect/google/callback";
-      const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID; // Make sure to add this to .env.local!
-
-      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=${encodeURIComponent(GOOGLE_SCOPES)}&access_type=offline&prompt=consent`;
-
-      window.location.href = authUrl;
-    } else {
-      alert("This connector flow is not implemented yet.");
+    try {
+      window.location.assign(getOAuthUrl(connector.id));
+    } catch (error: any) {
+      alert(error.message);
     }
+  };
+
+  const handleDisconnect = () => {
+    // Adding a confirmation step prevents accidental disconnects
+    if (
+      !window.confirm(`Are you sure you want to disconnect ${connector.name}?`)
+    )
+      return;
+
+    startTransition(async () => {
+      try {
+        await disconnectTool(connector.id);
+      } catch (error) {
+        alert("Failed to disconnect tool.");
+      }
+    });
   };
 
   return (
@@ -47,7 +45,6 @@ export function ConnectorCard({ connector }: ConnectorCardProps) {
       <div>
         {/* Top Row: App Icon (Left) + Primary Action (Right) */}
         <div className="flex items-start justify-between">
-          {/* Replace your existing icon div with this: */}
           <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-border/50 bg-zinc-800/50 shadow-sm p-1.5">
             <BrandIcon
               id={connector.id}
@@ -63,10 +60,17 @@ export function ConnectorCard({ connector }: ConnectorCardProps) {
               <Button
                 variant="outline"
                 size="icon"
-                className="h-8 w-8 border-border/40 text-muted-foreground hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-400"
+                onClick={handleDisconnect}
+                disabled={isPending}
+                className="h-8 w-8 border-border/40 text-muted-foreground transition-colors hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-400"
+                title="Disconnect tool"
               >
-                <Settings2 className="h-4 w-4" />
-                <span className="sr-only">Disconnect or configure</span>
+                {isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Unplug className="h-4 w-4" />
+                )}
+                <span className="sr-only">Disconnect</span>
               </Button>
             </div>
           ) : (
@@ -102,10 +106,9 @@ export function ConnectorCard({ connector }: ConnectorCardProps) {
         </p>
       </div>
 
-      {/* Configuration Footer - FIXED TEXT WRAPPING */}
+      {/* Configuration Footer */}
       <div className="mt-4 rounded-lg border border-border/30 bg-black/20 p-3 text-xs">
         <div className="flex flex-col gap-2">
-          {/* Changed items-center to items-start, added gap-3, shrink-0 on label, text-right on value */}
           <div className="flex items-start justify-between gap-3">
             <span className="shrink-0 text-muted-foreground">Tier</span>
             <span className="font-medium text-foreground text-right leading-tight">
